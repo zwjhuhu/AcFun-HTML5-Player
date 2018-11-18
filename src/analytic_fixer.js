@@ -1,17 +1,8 @@
 let script = document.createElement('script');
-script.textContent = '(' + (function () {
-  window.addEventListener('beforeunload', function () {
-    XMLHttpRequest = function () {
-      return {
-        open: function (method, url, async) {
-          this.url = url;
-        },
-        send: function (data){
-          navigator.sendBeacon(this.url, data);
-          console.log('beacon queued', this.url, data);
-        },
-      }
-    };
-  })
-}).toString() + ')();';
+//just disable sync xhr
+script.textContent = `
+  const oriOpen = window.XMLHttpRequest.prototype.open;
+  window.XMLHttpRequest.prototype.open = function(method,url,async){
+    oriOpen.call(this,method,url);
+  }`;
 document.firstElementChild.appendChild(script);
