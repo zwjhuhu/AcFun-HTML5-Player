@@ -32,10 +32,10 @@
         "hls.light.min.js",
         "hlsjsMediaInfo.min.js",
         "jquery-3.3.1.min.js",
-        "google-style-loading.min.js",
-        "CommentCoreLibrary.min.js",
-        "biliplus_shield.min.js",
-        "ABPlayer.min.js",
+        "google-style-loading.js",
+        "CommentCoreLibrary.js",
+        "biliplus_shield.js",
+        "ABPlayer.js",
         "acfun_html5.js"
       ],
       "run_at": "document_end"
