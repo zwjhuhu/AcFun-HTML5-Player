@@ -1,3 +1,22 @@
+//config tune
+let _flvConfig = {
+    seekType: 'range',
+    reuseRedirectedURL: true,
+    fixAudioTimestampGap: false,
+    enableWorker: false,//cross domain problem
+    headers: {
+        'Referer': window.location.href,
+        'User-Agent': window.navigator.userAgent
+    }
+};
+
+let _hlsConfig = {
+    enableWorker: true,
+    maxMaxBufferLength:180,
+    capLevelToPlayerSize: true,
+    startLevel: 2
+};
+
 function createPopup(param) {
     if (!param.content)
         return;
@@ -358,7 +377,7 @@ let load_fail = function (type, info, detail) {
 };
 let flvparam = function (select) {
     currentSrc = select;
-    createPlayer({ detail: { src: srcUrl[select], option: { seekType: 'range', reuseRedirectedURL: false, fixAudioTimestampGap: false } } });
+    createPlayer({ detail: { src: srcUrl[select], option: _flvConfig}});
     if (srcUrl[select].partial) {
         setTimeout(function () { abpinst.createPopup(_t('partialAvailable'), 3e3); }, 4e3);
     }
@@ -446,7 +465,7 @@ function init() {
     dest.remove();
     let blob = new Blob(['<!DOCTYPE HTML><html><head><meta charset="UTF-8"><style>html,body{height:100%;width:100%;margin:0;padding:0}</style><link rel="stylesheet" type="text/css" href="' + chrome.extension.getURL('ABPlayer.css') + '"></head><body></body></html>'], { type: 'text/html' });
     let bloburl = URL.createObjectURL(blob);
-    window.playerIframe = container.appendChild(_('iframe', { className: 'AHP-Player-Container', allowfullscreen: true, src: bloburl, allow: 'fullscreen; autoplay' }));
+    window.playerIframe = container.appendChild(_('iframe', { className: 'AHP-Player-Container', src: bloburl, allow: 'fullscreen; autoplay' }));
     playerIframe.onload = function () {
         URL.revokeObjectURL(bloburl);
         try {
@@ -647,17 +666,11 @@ function sourceTypeRoute(data) {
                         )).join('');
                         let masterManifestBlob = new Blob([masterManifest], { mimeType: 'application/vnd.apple.mpegurl' });
                         let masterManifestUrl = URL.createObjectURL(masterManifestBlob);
-                        let conf = {
-                            enableWorker: isChrome,
-                            capLevelToPlayerSize: true,
-                            startLevel: 2
-                        };
                         if (abpinst.lastTime) {
-                            conf.startPosition = abpinst.lastTime;
+                            _hlsConfig.startPosition = abpinst.lastTime;
                             delete abpinst.lastTime;
-                            console.log('starting from', conf.startPosition);
                         }
-                        window.hlsplayer = new Hls(conf);
+                        window.hlsplayer = new Hls(_hlsConfig);
                         hlsplayer.loadSource(masterManifestUrl);
                         hlsplayer.attachMedia(abpinst.video);
                         hlsplayer.once(Hls.Events.MANIFEST_PARSED, () => URL.revokeObjectURL(masterManifestUrl));
@@ -666,9 +679,6 @@ function sourceTypeRoute(data) {
                                 abpinst.createPopup(_t('switched') + ' ' + (hlsplayer.levelName[hlsPending] || hlsPending), 2e3);
                                 hlsPending = -1;
                             }
-                        });
-                        hlsplayer.on('hlsMIStatPercentage', function initialDisplay(m, p) {
-                            abpinst.playerUnit.querySelector('#info-box').childNodes[0].childNodes[0].textContent = ABP.Strings.buffering + ' ' + (p * 100).toFixed(2) + '%';
                         });
                         hlsplayer.on(Hls.Events.ERROR, function (n, d) { console.log(n, d) });
 
@@ -872,7 +882,7 @@ position:absolute;bottom:0;left:0;right:0;font-size:15px
         if (document.getElementById('pageInfo') != null) {
             //普通投稿
             pageInfo = Object.assign({}, (document.getElementById('pageInfo') || { dataset: {} }).dataset);
-            
+
             init();
         } else {
             //剧集视频
