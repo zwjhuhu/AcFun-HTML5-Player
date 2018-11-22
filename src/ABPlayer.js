@@ -2486,24 +2486,19 @@ ABP.Strings = new Proxy({}, {
 
                 new Promise((resolve,reject) => {
                     try{
-                        if (shouldContainComment) {
-                            let width = Math.ceil(cmManager.width * devicePixelRatio), height = Math.ceil(cmManager.height * devicePixelRatio),
+                        let width = Math.ceil(cmManager.width * devicePixelRatio), height = Math.ceil(cmManager.height * devicePixelRatio),
                             vh = video.videoHeight, vw = video.videoWidth, vl = 0,  vt = 0;
-                            canvas.width = width;
-                            canvas.height = height;
-                            ctx.fillStyle = 'black';
-                            ctx.fillRect(0, 0, width, height);
-                            // calculate video offset
-                            if (vh * (width / vw) > vh) {
-                                vh = vh * (width / vw);
-                                vw = width;
-                                vt = Math.floor((height - vh) / 2);
-                            } else {
-                                vw = vw * (height / vh);
-                                vh = height;
-                                vl = Math.floor((width - vw) / 2);
-                            }
-                            ctx.drawImage(video, vl, vt, vw, vh);
+                            canvas.width = vw;
+                            canvas.height = vh;
+                        if (shouldContainComment) {
+                            // screenshot size match video size
+                            //ctx.fillStyle = 'black';
+                            //ctx.fillRect(0, 0, vw, vh);
+                            //vh = Math.floor(vh* width / vw);
+                            //vl = 0;
+                            //vt = Math.floor((height - vh) / 2);
+                            //vw = width;
+                            ctx.drawImage(video, 0, 0);
                             if (abpinst.cmManager.options.global.useCSS) {
                                 if (typeof window.SVGAElement === 'undefined' || !isChrome){
                                     reject('svg not support or corss domain in firefox window.open return null');
@@ -2513,7 +2508,7 @@ ABP.Strings = new Proxy({}, {
                                     img.src = imgUrl;
                                     img.onload = () => {
                                         try{
-                                            ctx.drawImage(img, 0, 0);
+                                            ctx.drawImage(img, 0, 0, vw, vh);
                                             resolve(canvas.toDataURL());
                                         }catch(err){
                                             reject(err);
@@ -2521,12 +2516,10 @@ ABP.Strings = new Proxy({}, {
                                     };
                                 }
                             } else {
-                                ctx.drawImage(cmManager.canvas, 0, 0);
+                                ctx.drawImage(cmManager.canvas, 0, 0, vw, vh);
                                 window.setTimeout(() => {resolve(canvas.toDataURL());},0);
                             }
                         } else {
-                            canvas.width = video.videoWidth;
-                            canvas.height = video.videoHeight;
                             ctx.drawImage(video, 0, 0);
                             window.setTimeout(() => {resolve(canvas.toDataURL());},0);
                         }
