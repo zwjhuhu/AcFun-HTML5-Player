@@ -2405,58 +2405,156 @@ ABP.Strings = new Proxy({}, {
 			},
 			touchContextTimer=null,activingContext=!1;
 			contextMenuBody.querySelector('#Player-Screenshot .dmMenu')[addEventListener]('click',function(e){
-				var shouldContainComment = e.target.dataset.comment == 'on';
-				var canvas = _('canvas'), video = ABPInst.video, ctx = canvas.getContext('2d'), devicePixelRatio = window.devicePixelRatio, cmManager = ABPInst.cmManager, paused = video.paused;
-				video.pause();
-				if (shouldContainComment) {
-					if (abpinst.cmManager.options.global.useCSS) {
-						ABPInst.createPopup(ABP.Strings.screenshotCSSNoSupport, 3e3);
-						!paused && video.play();
-						return;
-					}
-					var width = Math.ceil(cmManager.width * devicePixelRatio), height = Math.ceil(cmManager.height * devicePixelRatio),
-					vh = video.videoHeight, vw = video.videoWidth, vl = 0,  vt = 0;
-					canvas.width = width;
-					canvas.height = height;
-					ctx.fillStyle = 'black';
-					ctx.fillRect(0, 0, width, height);
+                if(window.screenshotProcessing === true){
+                    return ;
+                }
+                window.screenshotProcessing = true;
+				let shouldContainComment = e.target.dataset.comment == 'on';
 
-					// calculate video offset
-					if (vh * (width / vw) > vh) {
-						vh = vh * (width / vw);
-						vw = width;
-						vt = Math.floor((height - vh) / 2);
-					} else {
-						vw = vw * (height / vh);
-						vh = height;
-						vl = Math.floor((width - vw) / 2);
-					}
-					ctx.drawImage(video, vl, vt, vw, vh);
+				let canvas = _('canvas'), video = ABPInst.video, ctx = canvas.getContext('2d'), devicePixelRatio = window.devicePixelRatio,
+                    cmManager = ABPInst.cmManager;
+                // , paused = video.paused;
+				//!paused && video.pause();
+                const convertCssDmToImgUrl = (width,height) => {
+                    let children = cmManager.stage.childNodes;
+                    let svgStr = '';
+                    let marginTop = 3;
+                    let lineHeight = 25;
+                    let transform = null;
+                    let left = null;
+                    let top = null;
+                    let computedStyle = null;
+                    for(let i=0,len=children.length,node=null,str=null;i<len;i++){
+                        node = children[i]
+                        if(node.nodeType === 1&&node.className.indexOf('')>-1&&node.textContent.trim()){
+                            computedStyle = window.getComputedStyle(node,null);
+                            str = '<text style="';
+                            let style = node.style
+                            let styleArr = [];
+                            if(style.fontSize) {
+                                styleArr[0] = 'font-size:' + style.fontSize +';';
+                            }
+                            if(style.color) {
+                                styleArr[1] = 'fill:' + style.color +';';
+                            }
+                            if(styleArr.length){
+                                str += styleArr.join('') + '"';
+                            }
+                            left = parseInt(computedStyle.getPropertyValue("left").replace('px',''));
+                            str += ' x="' + left +'"';
+                            top = parseInt(computedStyle.getPropertyValue("top").replace('px',''));
+                            marginTop = parseInt(computedStyle.getPropertyValue("margin-top").replace('px',''));
+                            lineHeight = parseInt(computedStyle.getPropertyValue("line-height").replace('px',''));
+                            str += ' y="' + (top + lineHeight + marginTop) +'"';
+                            transform = computedStyle.getPropertyValue("transform");
+                            str += ' transform="' + transform +'"';
+                            if(node.className) {
+                                str += ' class="' + node.className.replace(/paused +/,'') +'"';
+                            }
+                            str += '>';
+                            str += node.textContent.trim();
+                            str += '</text>'
+                            svgStr += str;
+                        }
+                    }
+                     let svgXML=
+                     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+                     <style type="text/css" >
+                     <![CDATA[
+                     .cmt {
+                        fill: #fff;
+                        font-family: "Helvetica Neue",Helvetica,"Nimbus Sans L",Arial,"Liberation Sans","PingFang SC","Hiragino Sans GB","Source Han Sans CN","Source Han Sans SC","Microsoft YaHei","Wenquanyi Micro Hei","WenQuanYi Zen Hei","ST Heiti",SimHei,"WenQuanYi Zen Hei Sharp",sans-serif;
+                        font-size: 25px;
+                        font-weight: bold;
+                     }
+                     .outline.shadow{
+                            stroke:black;
+                            stroke-width:.25px;
+                    }
+                    .outline {
+                            stroke: black;
+                            stroke-width:.7px;
+                    }
+                    ]]>
+                    </style>
+                     ${svgStr}
+                     </svg>`;
+                     //console.log(svgXML);
+                     let url = 'data:image/svg+xml;base64,' + window.btoa(unescape(encodeURIComponent(svgXML)));
+                     return url;
+                };
 
-					ctx.drawImage(cmManager.canvas, 0, 0);
-				} else {
-					canvas.width = video.videoWidth;
-					canvas.height = video.videoHeight;
-					ctx.drawImage(video, 0, 0);
-				}
-				try {
-					var url = canvas.toDataURL();
-					var newWin = window.open('about:blank');
-					try {
-					newWin.onload = function() {
-						newWin.document.title = ABP.Strings.screenshot + ' @ ' + formatTime(video.currentTime) + ' - ' + ABP.Strings[shouldContainComment ? 'screenshotWithComment' : 'screenshotWithoutComment'];
-						newWin.document.body.innerHTML = '<style>body{background:#222;padding:0;margin:0}img{width:100%;height:100%;object-fit:scale-down}</style><img src="'+url+'">';
-						console.log(newWin.document.body)
-					}
-					} catch(e) {
-						//火狐 wtf???
-						newWin.location.href = url;
-					}
-				} catch(e) {
-					console.error(e);
-					ABPInst.createPopup(ABP.Strings.screenshotError, 3e3);
-					!paused && video.play();
-				}
+                new Promise((resolve,reject) => {
+                    try{
+                        if (shouldContainComment) {
+                            let width = Math.ceil(cmManager.width * devicePixelRatio), height = Math.ceil(cmManager.height * devicePixelRatio),
+                            vh = video.videoHeight, vw = video.videoWidth, vl = 0,  vt = 0;
+                            canvas.width = width;
+                            canvas.height = height;
+                            ctx.fillStyle = 'black';
+                            ctx.fillRect(0, 0, width, height);
+                            // calculate video offset
+                            if (vh * (width / vw) > vh) {
+                                vh = vh * (width / vw);
+                                vw = width;
+                                vt = Math.floor((height - vh) / 2);
+                            } else {
+                                vw = vw * (height / vh);
+                                vh = height;
+                                vl = Math.floor((width - vw) / 2);
+                            }
+                            ctx.drawImage(video, vl, vt, vw, vh);
+                            if (abpinst.cmManager.options.global.useCSS) {
+                                if (typeof window.SVGAElement === 'undefined' || !isChrome){
+                                    reject('svg not support or corss domain in firefox window.open return null');
+                                } else {
+                                    let imgUrl = convertCssDmToImgUrl(width,height);
+                                    let img = window.document.createElement('img');
+                                    img.src = imgUrl;
+                                    img.onload = () => {
+                                        try{
+                                            ctx.drawImage(img, 0, 0);
+                                            resolve(canvas.toDataURL());
+                                        }catch(err){
+                                            reject(err);
+                                        }
+                                    };
+                                }
+                            } else {
+                                ctx.drawImage(cmManager.canvas, 0, 0);
+                                window.setTimeout(() => {resolve(canvas.toDataURL());},0);
+                            }
+                        } else {
+                            canvas.width = video.videoWidth;
+                            canvas.height = video.videoHeight;
+                            ctx.drawImage(video, 0, 0);
+                            window.setTimeout(() => {resolve(canvas.toDataURL());},0);
+                        }
+                    }catch(e){
+                        reject(e);
+                    }
+                }).then((url) => {
+                    let newWin = window.open('about:blank');
+                    try {
+                        newWin.onload = function() {
+                            newWin.document.title = ABP.Strings.screenshot + ' @ ' + formatTime(video.currentTime) + ' - '
+                            + ABP.Strings[shouldContainComment ? 'screenshotWithComment' : 'screenshotWithoutComment'];
+                            newWin.document.body.innerHTML = '<style>body{background:#222;padding:0;margin:0;}img{width:100%;height:100%;object-fit:scale-down;}</style><img src="'+url+'">';
+                            //console.log(newWin.document.body)
+                        }
+                    } catch(e) {
+                        console.log(e);
+                        //火狐 wtf???
+                        newWin.location.href = url;
+                    }
+                }).catch((e) => {
+                    console.log(e);
+                    ABPInst.createPopup(ABP.Strings.screenshotError, 3e3);
+                }).then(()=>{
+                    window.screenshotProcessing = false;
+                    //!paused && video.paused && video.play();
+                });
+
 			});
 			contextMenuBody.querySelector('#Player-Speed-Control .dmMenu')[addEventListener]('click',function(e){
 				var speed=e.target.getAttribute('data-speed');
