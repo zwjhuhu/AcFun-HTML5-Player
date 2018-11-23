@@ -2415,114 +2415,132 @@ ABP.Strings = new Proxy({}, {
                     cmManager = ABPInst.cmManager;
                 // , paused = video.paused;
 				//!paused && video.pause();
-                const convertCssDmToImgUrl = (width,height) => {
+                const translateRGBAColor = (color,opacity) => {
+                    let transColor = color.toLowerCase();
+                    if(color.startsWith('#')){
+                        let hex = color.substring(1);
+                        let len = hex.length;
+                        if(len === 4){
+                            hex = hex.substring(1);
+                        }else if(len === 8){
+                            hex= hex.substring(2);
+                        }
+                        len = hex.length;
+                        if(len === 3){
+                            hex = hex.split('').reduce((ret,val)=> {return ret += val + val;},'');
+                        }
+                        let r = parseInt(h.substring(0,2),16);
+                        let g = parseInt(h.substring(2,4),16);
+                        let b = parseInt(h.substring(4,6),16);
+                        let a = opacity;
+                        transColor =  'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+                    } else if(color.startsWith('rgb(')) {
+                        transColor = color.replace(')',','+ opacity +')');
+                    } else if(color.startsWith('rgba(')) {
+                        transColor = color.substring(0, color.lastIndexOf(',')) + ','+ opacity +')';
+                    } else {
+                        //do nothing
+                    }
+                    return transColor;
+                }
+
+                const drawCssDms = () => {
+                    ctx.imageSmoothingEnabled = false;
+                    ctx.textBaseline = 'top';
+                    ctx.textAlign = 'left';
+                    let outline = cmManager.options.global.outline;
+                    let shadow = cmManager.options.global.shadow;
+                    let font = "-apple-system,Arial,'PingFang SC','STHeiti Light','Hiragino Kaku Gothic ProN','Microsoft YaHei'";
                     let children = cmManager.stage.childNodes;
-                    let svgStr = '';
-                    let marginTop = 3;
-                    let lineHeight = 25;
+                    let fontSize = null;
+                    let marginTop = null;
                     let transform = null;
                     let left = null;
                     let top = null;
+                    let color = null;//rgba
+                    let opacity = null;
+                    let text = null;
+                    let x = null;
+                    let y = null;
                     let computedStyle = null;
-                    for(let i=0,len=children.length,node=null,str=null;i<len;i++){
-                        node = children[i]
-                        if(node.nodeType === 1&&node.className.indexOf('')>-1&&node.textContent.trim()){
+                    let node = null;
+                    let lastFontSize = null;
+                    let lastColor = null;
+                    for(let i = 0,len = children.length;i<len;i++){
+                        node = children[i];
+                        text = node.textContent.trim();
+                        if(node.nodeType === 1 && node.className.indexOf('')>-1 && text){
                             computedStyle = window.getComputedStyle(node,null);
-                            str = '<text style="';
-                            let style = node.style
-                            let styleArr = [];
-                            if(style.fontSize) {
-                                styleArr[0] = 'font-size:' + style.fontSize +';';
+                            fontSize = parseInt(computedStyle.getPropertyValue('font-size').replace('px',''));
+                            color = computedStyle.getPropertyValue('color').replace(/ /g,'');
+                            opacity = computedStyle.getPropertyValue('opacity').toString();
+                            opacity = opacity ? parseFloat(opacity) : 1;
+                            color = translateRGBAColor(color,opacity);
+                            outline = node.className.indexOf('outline') > -1;
+                            shadow = node.className.indexOf('shadow') > -1;
+                            left = parseInt(computedStyle.getPropertyValue('left').replace('px',''));
+                            top = parseInt(computedStyle.getPropertyValue('top').replace('px',''));
+                            marginTop = parseInt(computedStyle.getPropertyValue('margin-top').replace('px',''));
+                            transform = computedStyle.getPropertyValue('transform').replace(/ /g,'');
+                            if (transform.startsWith('matrix')){
+                                let parts = transform.split(',');
+                                let offsetX = parseInt(parts[4]);
+                                let offsetY = parseInt(parts[5]);
+                                x = left + offsetX;
+                                y = top + offsetY + marginTop;
                             }
-                            if(style.color) {
-                                styleArr[1] = 'fill:' + style.color +';';
+                            if(!lastFontSize || fontSize !== lastFontSize) {
+                                ctx.font = 'bold '+ fontSize * devicePixelRatio + 'px ' + font;
                             }
-                            if(styleArr.length){
-                                str += styleArr.join('') + '"';
+                            if (!lastColor || lastColor !== color){
+                                let strokeColor = color.toLowerCase().startsWith('rgba(0,0,0') ? `rgba(255,255,255,${opacity})` : `rgba(0,0,0,${opacity})`;
+                                ctx.fillStyle = color;
+                                ctx.shadowColor = strokeColor;
+                                ctx.strokeStyle = strokeColor;
                             }
-                            left = parseInt(computedStyle.getPropertyValue("left").replace('px',''));
-                            str += ' x="' + left +'"';
-                            top = parseInt(computedStyle.getPropertyValue("top").replace('px',''));
-                            marginTop = parseInt(computedStyle.getPropertyValue("margin-top").replace('px',''));
-                            lineHeight = parseInt(computedStyle.getPropertyValue("line-height").replace('px',''));
-                            str += ' y="' + (top + lineHeight + marginTop) +'"';
-                            transform = computedStyle.getPropertyValue("transform");
-                            str += ' transform="' + transform +'"';
-                            if(node.className) {
-                                str += ' class="' + node.className.replace(/paused +/,'') +'"';
+                            if(shadow) {
+                                ctx.lineWidth = .25 * devicePixelRatio;
+                                ctx.shadowBlur = 2 * devicePixelRatio;
+                            } else {
+                                ctx.lineWidth = .7 * devicePixelRatio;
+                                ctx.shadowBlur = 0;
                             }
-                            str += '>';
-                            str += node.textContent.trim();
-                            str += '</text>'
-                            svgStr += str;
+                            ctx.fillText(text, x, y);
+                            if (outline){
+                                ctx.strokeText(text, x, y);
+                            }
+                            lastFontSize = fontSize;
+                            lastColor = color;
                         }
                     }
-                     let svgXML=
-                     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
-                     <style type="text/css" >
-                     <![CDATA[
-                     .cmt {
-                        fill: #fff;
-                        font-family: "Helvetica Neue",Helvetica,"Nimbus Sans L",Arial,"Liberation Sans","PingFang SC","Hiragino Sans GB","Source Han Sans CN","Source Han Sans SC","Microsoft YaHei","Wenquanyi Micro Hei","WenQuanYi Zen Hei","ST Heiti",SimHei,"WenQuanYi Zen Hei Sharp",sans-serif;
-                        font-size: 25px;
-                        font-weight: bold;
-                     }
-                     .outline.shadow{
-                            stroke:black;
-                            stroke-width:.25px;
-                    }
-                    .outline {
-                            stroke: black;
-                            stroke-width:.7px;
-                    }
-                    ]]>
-                    </style>
-                     ${svgStr}
-                     </svg>`;
-                     //console.log(svgXML);
-                     let url = 'data:image/svg+xml;base64,' + window.btoa(unescape(encodeURIComponent(svgXML)));
-                     return url;
                 };
-
                 new Promise((resolve,reject) => {
                     try{
                         let width = Math.ceil(cmManager.width * devicePixelRatio), height = Math.ceil(cmManager.height * devicePixelRatio),
                             vh = video.videoHeight, vw = video.videoWidth, vl = 0,  vt = 0;
-                            canvas.width = vw;
-                            canvas.height = vh;
+
                         if (shouldContainComment) {
-                            // screenshot size match video size
                             //ctx.fillStyle = 'black';
                             //ctx.fillRect(0, 0, vw, vh);
                             //vh = Math.floor(vh* width / vw);
                             //vl = 0;
                             //vt = Math.floor((height - vh) / 2);
                             //vw = width;
-                            ctx.drawImage(video, 0, 0);
-                            if (abpinst.cmManager.options.global.useCSS) {
-                                if (typeof window.SVGAElement === 'undefined' || !isChrome){
-                                    reject('svg not support or corss domain in firefox window.open return null');
-                                } else {
-                                    let imgUrl = convertCssDmToImgUrl(width,height);
-                                    let img = window.document.createElement('img');
-                                    img.src = imgUrl;
-                                    img.onload = () => {
-                                        try{
-                                            ctx.drawImage(img, 0, 0, vw, vh);
-                                            resolve(canvas.toDataURL());
-                                        }catch(err){
-                                            reject(err);
-                                        }
-                                    };
-                                }
+                            canvas.width = width;
+                            canvas.height = height;
+                            // stretch video to fit
+                            ctx.drawImage(video, 0, 0, width,height);
+                            if (cmManager.options.global.useCSS) {
+                                drawCssDms();
                             } else {
-                                ctx.drawImage(cmManager.canvas, 0, 0, vw, vh);
-                                window.setTimeout(() => {resolve(canvas.toDataURL());},0);
+                                ctx.drawImage(cmManager.canvas, 0, 0, width, height);
                             }
                         } else {
+                            canvas.width = vw;
+                            canvas.height = vh;
                             ctx.drawImage(video, 0, 0);
-                            window.setTimeout(() => {resolve(canvas.toDataURL());},0);
                         }
+                        window.setTimeout(() => {resolve(canvas.toDataURL());},0);
                     }catch(e){
                         reject(e);
                     }
