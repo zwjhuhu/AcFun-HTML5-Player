@@ -299,9 +299,13 @@ var CoreComment = (function () {
         if (recycle === void 0) { recycle = null; }
         if (recycle !== null) {
             this.dom = recycle.dom;
-        }
-        else {
+        }else if (!this.dom){
             this.dom = document.createElement("div");
+        }else{
+            this.dom.className = '';
+            this.dom.textContent = '';
+            this.dom.innerText = '';
+            this.dom.style.cssText = '';
         }
 		this.dom.className = this.parent.options.global.className;
 		this.parent.options.global.outline && this.dom.classList.add('outline');
@@ -502,6 +506,46 @@ var CoreComment = (function () {
         enumerable: true,
         configurable: true
     });
+    Object.defineProperty(CoreComment.prototype, "textData", {
+        get: function () {
+            if(!this._cache) {
+                this._cache = this.parent._caches.length ? this.parent._caches.shift() : null;
+            }
+            return this._cache;
+        },
+        set: function (cache) {
+            if(!cache) {
+                if(this._cache && this._cache.nodeName.toUpperCase()==='CANVAS') {
+                    this.parent._caches.push(this._cache);
+                }
+                this._cache = null;
+            } else {
+                this._cache = cache;
+            }
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(CoreComment.prototype, "dom", {
+        get: function () {
+            if(!this._dom) {
+                this._dom = this.parent._doms.length ? this.parent._doms.shift() : null;
+            }
+            return this._dom;
+        },
+        set: function (dom) {
+            if(!dom) {
+                if(this._dom && this._dom.nodeType) {
+                    this.parent._doms.push(this._dom);
+                }
+                this._dom = null;
+            } else {
+                this._dom = dom;
+            }
+        },
+        enumerable: true,
+        configurable: true
+    });
     Object.defineProperty(CoreComment.prototype, "font", {
         get: function () {
             return this._font;
@@ -671,7 +715,7 @@ var CSSScrollComment = (function (_super) {
     return CSSScrollComment;
 }(ScrollComment));
 
-/** 
+/**
  * Comment Filters Module Simplified (only supports modifiers & types)
  * @license MIT
  * @author Jim Chen
@@ -703,7 +747,7 @@ function CommentFilter(){
 		return true;
 	};
 	this.addRule = function(rule){
-		
+
 	};
 	this.addModifier = function(f){
 		this.modifiers.push(f);
@@ -748,14 +792,17 @@ var CommentManager = (function() {
 	function CommentManager(stageObject){
 		var __timer = 0;
 		var self = this;
-		
+
 		this._listeners = {};
 		this._lastPosition = 0;
-		
+
 		this.stage = stageObject;
 		this.paused = true;
 		this.pausedTime = 0;
 		this.canvas = document.createElement('canvas');
+        this._ctx = this.canvas.getContext('2d');
+        this._caches = [];
+        this._doms = [];
 		this.canvasFPS = 0;
 		self.canvas.style.width = '100%';
 		self.canvas.style.height = '100%';
@@ -790,7 +837,7 @@ var CommentManager = (function() {
 			reverse:new CommentSpaceAllocator(0,0),
 			scrollbtm:new CommentSpaceAllocator(0,0)
 		};
-		
+
 		/** Precompute the offset width **/
 		this.width = this.stage.offsetWidth;
 		this.height = this.stage.offsetHeight;
@@ -798,14 +845,15 @@ var CommentManager = (function() {
 		this.startTimer = function(){
 			if(__timer > 0)
 				return;
-			var lastTPos = new Date().getTime();
+			var lastTPos = Date.now();
 			var cmMgr = this;
+            var tick = 17;
 			__timer = window.setInterval(function(){
-				var elapsed = new Date().getTime() - lastTPos;
-				lastTPos = new Date().getTime();
-				cmMgr.onTimerEvent(elapsed,cmMgr);
-				cmMgr.sendQueueLoader();
-			},1e3/60);
+                var elapsed = Date.now() - lastTPos;
+                lastTPos = Date.now();
+                cmMgr.onTimerEvent(elapsed,cmMgr);
+                cmMgr.sendQueueLoader();
+			},tick);
 			this.paused = false;
 			this.pausedTime = Date.now() - pauseTime;
 		};
@@ -868,7 +916,7 @@ var CommentManager = (function() {
 		this.addEventListener('clear',function(){
 			sendQueue=[];
 		});
-		
+
 		requestAnimationFrame(this.canvasDrawerWrapper);
 		(function(){
 			var prevRatio = window.devicePixelRatio;
@@ -959,7 +1007,9 @@ var CommentManager = (function() {
 			this.runline[0].finish();
 		}
 		this.dispatchEvent("clear");
-		this.canvas.getContext('2d').clearRect(0,0,this.canvas.width,this.canvas.height);
+		this._ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
+        this._doms = [];
+        this._caches = [];
 	};
 
 	CommentManager.prototype.setBounds = function(){
@@ -1010,7 +1060,7 @@ var CommentManager = (function() {
 		this.canvas.height = this.canvas.offsetHeight * devicePixelRatio;
         this.ttlRecalcAll();
         drawForResize = true;
-		
+
 		}catch(e){
 			console.error('shit happened! forcing CSS! ',e.message);
 			this.useCSS(true);
@@ -1027,13 +1077,13 @@ var CommentManager = (function() {
 			return;
 		}
 		var now=performance.now()|0, cmt, i, devicePixelRatio = window.devicePixelRatio, pausedTime = this.pausedTime,
-		ctx = this.canvas.getContext('2d'),
+		ctx = this._ctx,
 		canvasWidth = this.width, canvasHeight = this.height,
 		x, y;
 		ctx.clearRect(0, 0, canvasWidth * devicePixelRatio, canvasHeight * devicePixelRatio);
 		ctx.globalAlpha=this.options.global.autoOpacity ? this.options.global.autoOpacityVal : this.options.global.opacity;
 		ctx.imageSmoothingEnabled = false;
-		
+
 		if(pausedTime!=0){
 			this.runline.forEach(function(cmt){
 				if(!cmt.textData)return;
@@ -1049,7 +1099,7 @@ var CommentManager = (function() {
 			})
 			this.pausedTime = 0;
 		}
-		
+
 		var devicePixelRatio = window.devicePixelRatio;
 		/*
 		maxBottomLine=[0];
@@ -1073,7 +1123,7 @@ var CommentManager = (function() {
 		maxBottomHeight=Math.max.apply(Math,maxBottomHeight);
 		maxTopMaxWidth=Math.max.apply(Math,maxTopMaxWidth);
 		maxTopHeight=Math.max.apply(Math,maxTopHeight);*/
-		
+
 		//canvasDraw(this);
 		/**
 		 * 180303
@@ -1113,8 +1163,8 @@ var CommentManager = (function() {
 		//ctx.drawImage(window.abpinst.video, 0, 0);
 
 		var cmMgr=this;
-				
-		ctx.globalAlpha=cmMgr.options.global.autoOpacity ? cmMgr.options.global.autoOpacityVal : cmMgr.options.global.opacity;
+
+		//ctx.globalAlpha=cmMgr.options.global.autoOpacity ? cmMgr.options.global.autoOpacityVal : cmMgr.options.global.opacity;
 		cmMgr.runline.forEach(function(cmt){
 			if(!cmt.textData)return;
 			switch(cmt.mode){
@@ -1167,16 +1217,17 @@ var CommentManager = (function() {
 			cmt.ttl = cmt.dur - runned;
 		}
 	},commentCanvasDrawer = function(cmt, outline, shadow){
-		var commentCanvas = document.createElement('canvas'), commentCanvasCtx = commentCanvas.getContext('2d'), devicePixelRatio = window.devicePixelRatio;
-		commentCanvas.width = 1;
-		commentCanvas.height = 1;
+		var commentCanvas = cmt.textData || document.createElement('canvas');
+        var commentCanvasCtx = commentCanvas.getContext('2d'), devicePixelRatio = window.devicePixelRatio;
+		//commentCanvas.width = 1;
+		//commentCanvas.height = 1;
 		commentCanvasCtx.font = 'bold '+ (cmt.size * devicePixelRatio) + 'px ' + font;
 		commentCanvasCtx.imageSmoothingEnabled = false;
 		cmt.width = ceil(commentCanvasCtx.measureText(cmt.text).width / devicePixelRatio)+2;
 		cmt.height = ceil(cmt.size+3)+2;
 		cmt.oriWidth = ceil(cmt.width * devicePixelRatio);
 		cmt.oriHeight = ceil(cmt.height * devicePixelRatio);
-		
+
 		commentCanvas.width = cmt.oriWidth;
 		commentCanvas.height = cmt.oriHeight;
 		commentCanvasCtx.font = 'bold '+ (cmt.size * devicePixelRatio) + 'px ' + font;
@@ -1184,7 +1235,7 @@ var CommentManager = (function() {
 		commentCanvasCtx.strokeStyle = (cmt._color == 0) ? '#FFFFFF' : '#000000';
 		commentCanvasCtx.textBaseline = 'bottom';
 		commentCanvasCtx.textAlign = 'left';
-		
+
 		if(shadow) {
 			commentCanvasCtx.lineWidth = .25 * devicePixelRatio;
 			commentCanvasCtx.shadowBlur = 2 * devicePixelRatio;
@@ -1194,7 +1245,7 @@ var CommentManager = (function() {
 		commentCanvasCtx.fillText(cmt.text, 1, commentCanvas.height-1);
 		if (outline)
 			commentCanvasCtx.strokeText(cmt.text, 1, commentCanvas.height-1);
-		
+
 		if(cmt.border){
 			commentCanvasCtx.lineWidth = round(2 * devicePixelRatio);
 			commentCanvasCtx.strokeStyle = '#00ffff';
@@ -1240,11 +1291,11 @@ var CommentManager = (function() {
 			data = this.filter.doModify(data);
 			if(data == null || data === false) return;
 		}
-		
+        var cmt = null;
 		//canvas break
 		if(!this.options.global.useCSS && [1,4,5].indexOf(data.mode) != -1 ){
 			var now = performance.now();
-			var cmt = new CoreComment(this, data);
+			cmt = new CoreComment(this, data);
 			cmt.dom = {style:{}};
 			commentCanvasDrawer(cmt, this.options.global.outline, this.options.global.shadow);
 			if( data.mode == 1 || data.mode == 6){
@@ -1262,11 +1313,11 @@ var CommentManager = (function() {
 				case 5:{this.csa.top.add(cmt);}break;
 			}
 		}else{
-			
+
 			if(data.mode === 1 || data.mode === 2 || data.mode === 6){
-				var cmt = new CSSScrollComment(this, data);
+				cmt = new CSSScrollComment(this, data);
 			}else{
-				var cmt = new CoreComment(this, data);
+				cmt = new CoreComment(this, data);
 			}
 			switch(cmt.mode){
 				case 1:cmt.align = 0;break;
@@ -1299,15 +1350,16 @@ var CommentManager = (function() {
 			}
 			cmt.y = cmt.y;
 		}
-		cmt.originalData=data;
-		this.dispatchEvent("enterComment", cmt);
-		this.runline.push(cmt);
+        if (cmt) {
+            cmt.originalData=data;
+            this.dispatchEvent("enterComment", cmt);
+            this.runline.push(cmt);
+        }
 	};
 	CommentManager.prototype.finish = function(cmt){
 		this.dispatchEvent("exitComment", cmt);
-		try{
+		if(cmt.dom && cmt.dom.nodeType)
 			this.stage.removeChild(cmt.dom);
-		}catch(e){}
 		var index = this.runline.indexOf(cmt);
 		if(index >= 0){
 			this.runline.splice(index, 1);
@@ -1323,6 +1375,8 @@ var CommentManager = (function() {
 		}
 		if(cmt.textData)
 			cmt.textData = null;
+        if(cmt.dom)
+            cmt.dom = null;
 	};
 	CommentManager.prototype.resumeComment=function (){
 		Array.prototype.slice.call(this.stage.children).forEach(function(a){
@@ -1362,7 +1416,7 @@ var CommentManager = (function() {
 				try{
 					this._listeners[event][i](data);
 				}catch(e){
-					console.err(e.stack);
+					console.error(e.stack);
 				}
 			}
 		}
@@ -1421,7 +1475,7 @@ var AcfunFormat = (function () {
                 data.text = data.text.replace(/\r/g,"\n");
                 data.text = data.text.replace(/\s/g,"\u00a0");
             } else {
-                try { 
+                try {
                     var x = JSON.parse(comment.m);
                 } catch (e) {
                     if (this._logBadComments) {
@@ -1470,8 +1524,8 @@ var AcfunFormat = (function () {
                     data.motion = [];
                     var moveDuration = 0;
                     var last = {
-                        x: data.x, 
-                        y: data.y, 
+                        x: data.x,
+                        y: data.y,
                         alpha: data.opacity,
                         color: data.color
                     };
@@ -1499,17 +1553,17 @@ var AcfunFormat = (function () {
                         }
                         if (x.z[m].hasOwnProperty('x') && typeof x.z[m].x === 'number') {
                             motion.x = {
-                                from: last.x, 
-                                to: x.z[m].x / 1000, 
-                                dur: dur, 
+                                from: last.x,
+                                to: x.z[m].x / 1000,
+                                dur: dur,
                                 delay: 0
                             };
                         }
                         if (x.z[m].hasOwnProperty('y') && typeof x.z[m].y === 'number') {
                             motion.y = {
-                                from: last.y, 
-                                to: x.z[m].y / 1000, 
-                                dur: dur, 
+                                from: last.y,
+                                to: x.z[m].y / 1000,
+                                dur: dur,
                                 delay: 0
                             };
                         }
@@ -1519,9 +1573,9 @@ var AcfunFormat = (function () {
                             typeof x.z[m].t === 'number' &&
                             x.z[m].t !== last.alpha) {
                             motion.alpha = {
-                                from: last.alpha, 
-                                to: x.z[m].t, 
-                                dur: dur, 
+                                from: last.alpha,
+                                to: x.z[m].t,
+                                dur: dur,
                                 delay: 0
                             };
                             last.alpha = motion.alpha.to;
@@ -1530,9 +1584,9 @@ var AcfunFormat = (function () {
                             typeof x.z[m].c === 'number' &&
                             x.z[m].c !== last.color) {
                             motion.color = {
-                                from: last.color, 
-                                to:x.z[m].c, 
-                                dur: dur, 
+                                from: last.color,
+                                to:x.z[m].c,
+                                dur: dur,
                                 delay: 0
                             };
                             last.color = motion.color.to;
@@ -1549,7 +1603,7 @@ var AcfunFormat = (function () {
                         if (x.w.l.length > 0) {
                             // Filters
                             if (this._logNotImplemented) {
-                                console.log('[Dbg] Filters not supported! ' + 
+                                console.log('[Dbg] Filters not supported! ' +
                                     JSON.stringify(x.w.l));
                             }
                         }
@@ -1559,7 +1613,7 @@ var AcfunFormat = (function () {
                     data.rX = x.r;
                     data.rY = x.k;
                 }
-                
+
             }
             return data;
         } else {
