@@ -3,6 +3,14 @@ let script = document.createElement('script');
 // but give a navigator.sendBeacon replace in beforeunload and pagehide event
 script.textContent = `
   (function(){
+      if ([
+        /acfun\.cn\/v\//,
+        /acfun\.cn\/bangumi\//,
+        /hapame\.com\/video\//
+      ].find(i => i.test(location.href))) {
+        console.log('[AHP] 假装有flash');
+        navigator.mimeTypes["application/x-shockwave-flash"] = navigator.mimeTypes["application/x-shockwave-flash"] || [];
+      }
       const oriOpen = window.XMLHttpRequest.prototype.open;
       window.XMLHttpRequest.prototype.open = function(method,url,async){
         if (async === false) {
@@ -23,5 +31,5 @@ script.textContent = `
           }
         };
       });
-  })()`;
+  })();`;
 document.firstElementChild.appendChild(script);
