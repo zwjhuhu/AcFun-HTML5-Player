@@ -1,8 +1,8 @@
 let script = document.createElement('script');
 // just disable sync xhr before document complete
 // but give a navigator.sendBeacon replace in beforeunload and pagehide event
-script.textContent = `
-  (function(){
+script.textContent = '('
+    + (function(){
       if ([
         /acfun\.cn\/v\//,
         /acfun\.cn\/bangumi\//,
@@ -31,5 +31,5 @@ script.textContent = `
           }
         };
       });
-  })();`;
+  }).toString() + ')();';
 document.firstElementChild.appendChild(script);
